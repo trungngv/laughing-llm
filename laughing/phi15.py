@@ -53,15 +53,22 @@ def extract_program(response: str):
     This could be improved further with more time.
     """
     # discard the original prompt as it is included in the response
-    #response = response[len(prompt):]
+    # response = response[len(prompt):]
+    start = response.find('Python code:')
+    if start >= 0:
+        response = response[start + len('Python code:'):].strip()
 
-    # get the result until the second def
-    def1_pos = response.index('def ')
-    try:
-        def2_pos = response.index('def ', def1_pos+4)
-    except ValueError as ex:
-        def2_pos = len(response)
-    return response[:def2_pos]
+    # get the code until the first line break or the 2nd def 
+    def_pos = min(response.find('def '), 0)
+    end = response.find('\n\n', def_pos+4)
+    if end > 0:
+        return response[def_pos:end]
+
+    end = response.find('def ', def_pos+4)
+    if end == -1:
+        end = len(response)
+    return response[def_pos:end]
+
 
 @torch.inference_mode()
 def gen_n_responses(model, tokenizer, prompt, max_new_tokens=512, n_responses=10):
@@ -77,20 +84,20 @@ def gen_n_responses(model, tokenizer, prompt, max_new_tokens=512, n_responses=10
     # greedy generation
     outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, use_cache=True)
     text = tokenizer.batch_decode(outputs)[0]
-    seqs.append(parse_response_phi15(text))
+    seqs.append(extract_program(text))
     # sampling generation
-    if num_sequences >= 1:
+    if n_responses >= 1:
         outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, use_cache=True,
-                                do_sample=True, top_k=3, num_return_sequences=n_sequences-1)
+                                do_sample=True, top_k=3, num_return_sequences=n_responses-1)
         seqs.extend(tokenizer.batch_decode(outputs, skip_special_tokens=True))
 
     return seqs
 
 @torch.inference_mode()
-def gen_n_prompts(model, tokenizer, prompts, max_new_tokens=512, n_responses=10):
+def gen_n_prompts(model, tokenizer, prompts, max_new_tokens=512):
     """Generate a batch of prompts (one response for each prompt)."""
-    inputs = tokenizer(prompts, return_tensors="pt", return_attention_mask=False,
-                       padding=True, truncation=True).to('cuda')
+    inputs = tokenizer(prompts, return_tensors="pt",
+                       return_attention_mask=False, padding=True).to('cuda')
     outputs = model.generate(**inputs, max_new_tokens=max_new_tokens,
                              eos_token_id=tokenizer.eos_token_id)
     texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
@@ -113,14 +120,14 @@ def make_prompts_for_tests_gen(tasks):
     Tasks should be data that come from code_alpaca_20k dataset.
     """
     def make_prompt(task):
-        return f"""Generate unit tests for the below problem and its solution in Python.
-        Write each unit test as a seperate Python function with meaningful name that starts with 'test_'.
-
+        return f"""
         Problem:
         {task['instruction']}
 
         Solution:
         {task['output']}
+
+        Test cases:
         """
     
     return [make_prompt(task) for task in tasks]
