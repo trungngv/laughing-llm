@@ -85,7 +85,11 @@ class TrainingArguments(transformers.TrainingArguments):
     length_penalty: float = field(default=1.0)
     only_use_provide: bool = field(default=False)
     only_use_sample: bool = field(default=False)
-    #Added by Trung
+    # config to make this fit into a small GPU memory (<15GB)
+    per_device_train_batch_size: int = field(default=1)
+    per_device_eval_batch_size: int = field(default=1)
+    gradient_checkpointing: bool = field(default=True)
+    # setting for Azure ML
     report_to: str=field(default="none")
 
 def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: str):
@@ -279,9 +283,9 @@ class RRHFTrainer(Trainer):
             inputs['labels'] = inputs['labels'][:-2]
             inputs["idxs"] = inputs["idxs"][:,:-2]
             inputs["scores"] = inputs["scores"][:,:-2]
-        # logits = model(input_ids=inputs.get('input_ids'), attention_mask=inputs.get('attention_mask'))[0] # (batch * cand) * L * V
+        logits = model(input_ids=inputs.get('input_ids'), attention_mask=inputs.get('attention_mask'))[0] # (batch * cand) * L * V
         # phi-1.5 does not output attention_mask
-        logits = model(input_ids=inputs.get('input_ids'))[0] # (batch * cand) * L * V
+        #logits = model(input_ids=inputs.get('input_ids'))[0] # (batch * cand) * L * V
         logits = F.log_softmax(logits, dim=-1)
         logit_label = self.gather_logits_labels(logits, inputs.get("labels"))
         scores = self.get_score(logit_label, inputs.get("labels"))

@@ -12,9 +12,10 @@ def load_model_and_tokenizer(lora_rank:int=None, model_max_length:int=2048):
     print('loading model...')
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_name_or_path,
+        device_map="auto",
         torch_dtype="auto",
         trust_remote_code=True
-    ).cuda()
+    )
 
     # Use Lora so we can train on smaller GPU    
     if lora_rank is not None:
@@ -27,7 +28,7 @@ def load_model_and_tokenizer(lora_rank:int=None, model_max_length:int=2048):
             bias="none",
             task_type="CAUSAL_LM"
         )
-        peft_model = get_peft_model(model, lora_config).cuda()
+        peft_model = get_peft_model(model, lora_config)
         peft_model.print_trainable_parameters()
     else:
         peft_model = None
