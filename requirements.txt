@@ -6,3 +6,5 @@ pynvml
 openai
 coverage
 pytest
+pytest-timeout
+peft
