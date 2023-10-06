@@ -70,6 +70,12 @@ def extract_program(response: str):
         end = len(response)
     return response[def_pos:end]
 
+def extract_tests(response: str):
+    """Extract tests from the model's response."""
+    start = max(response.find('Generate unit tests'), 0)
+    response = response[start:]
+    start = max(response.find('def '), 0)
+    return response[start:]
 
 @torch.inference_mode()
 def gen_n_responses(model, tokenizer, prompt, max_new_tokens=512, n_responses=10):
